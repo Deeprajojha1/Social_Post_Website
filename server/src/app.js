@@ -7,12 +7,34 @@ import { errorHandler } from "./middleware/error.middleware.js";
 
 const app = express();
 
+const configuredOrigins = [
+  process.env.CORS_ORIGIN,
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+]
+  .flatMap((value) => (value || "").split(","))
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => value.replace(/\/$/, ""));
+
+const vercelPreviewPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
+
 app.use(
   cors({
-    origin:
-      process.env.CORS_ORIGIN ||
-      process.env.FRONTEND_URL ||
-      "http://localhost:5173",
+    origin(origin, callback) {
+      // Allow non-browser requests (no Origin header), such as health checks.
+      if (!origin) return callback(null, true);
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+      const isConfiguredOrigin = configuredOrigins.includes(normalizedOrigin);
+      const isVercelPreview = vercelPreviewPattern.test(normalizedOrigin);
+
+      if (isConfiguredOrigin || isVercelPreview) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
